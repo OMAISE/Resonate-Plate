@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Resonant Plate — sound-reactive cymatics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0a0d;
+    --plate: #050506;
+    --amber: #d9a86c;
+    --amber-dim: #7a6142;
+    --cyan: #6fe3d1;
+    --ink: #e8e6e1;
+    --muted: #6b6f78;
+    --line: rgba(255,255,255,0.08);
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    overflow: hidden;
+  }
+  .brand{ font-family:'Space Grotesk', sans-serif; }
+
+  #app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    width:100vw;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink:0;
+  }
+  .brand-block{ display:flex; align-items:center; gap:10px; }
+  .dot{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--muted);
+    transition: background .3s, box-shadow .3s;
+  }
+  .dot.live{ background: #e0554d; box-shadow: 0 0 8px #e0554d99; }
+  .brand-name{ font-size: 15px; letter-spacing: 0.3px; font-weight: 500; }
+  .brand-sub{ font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .stat-cluster{ display:flex; gap: 22px; font-size: 11px; color: var(--muted); }
+  .stat-cluster b{ color: var(--ink); font-weight:500; }
+
+  main{
+    position:relative;
+    flex: 1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height: 0;
+  }
+  #plateWrap{
+    position:relative;
+    border-radius:50%;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 0 60px rgba(217,168,108,0.05),
+      inset 0 0 40px rgba(0,0,0,0.6);
+  }
+  canvas{ display:block; border-radius:50%; background: var(--plate); }
+
+  .controls{
+    position:absolute;
+    bottom: 26px;
+    left:50%;
+    transform: translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    background: rgba(10,10,13,0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 10px;
+  }
+  button.ctl{
+    display:flex; align-items:center; gap:7px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 9px 14px;
+    border-radius: 999px;
+    cursor:pointer;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  button.ctl:hover{ border-color: var(--cyan); color: var(--cyan); }
+  button.ctl.active{ background: var(--cyan); color: #05201c; border-color: var(--cyan); }
+  button.ctl:disabled{ opacity:0.35; cursor:not-allowed; }
+  input[type=file]{ display:none; }
+
+  .sens{ display:flex; align-items:center; gap:8px; padding: 0 6px 0 10px; }
+  .sens label{ font-size:10px; color: var(--muted); white-space:nowrap; }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width: 80px; height:2px; background: var(--line); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:11px; height:11px; border-radius:50%;
+    background: var(--amber); cursor:pointer;
+  }
+
+  footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    padding: 16px 22px 20px;
+    border-top: 1px solid var(--line);
+    flex-shrink:0;
+  }
+  .readout-label{ font-size: 10px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 4px; }
+  .readout-value{ font-size: 26px; color: var(--amber); font-weight: 500; }
+  .readout-value.small{ font-size: 15px; color: var(--ink); }
+  .readout-sub{ font-size: 10px; color: var(--muted); margin-top:2px; }
+  .col-right{ text-align:right; }
+
+  #startOverlay{
+    position:absolute; inset:0;
+    background: rgba(5,5,6,0.92);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap: 18px; text-align:center; padding: 30px;
+    z-index: 20;
+    border-radius: 50%;
+  }
+  #startOverlay h2{ font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:20px; margin:0; max-width: 280px; }
+  #startOverlay p{ font-size:12px; color: var(--muted); max-width: 260px; margin:0; line-height:1.5; }
+  #startBtn{
+    background: var(--amber); color: #241a0d; border:none;
+    font-family: inherit; font-weight:600; font-size:13px;
+    padding: 12px 26px; border-radius: 999px; cursor:pointer;
+  }
+  #startBtn:hover{ background: #e6ba86; }
+
+  @media (max-width: 640px){
+    .stat-cluster{ display:none; }
+    .brand-sub{ display:none; }
+    .controls{ flex-wrap:wrap; justify-content:center; max-width: 90vw; }
+    .readout-value{ font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand-block">
+      <div class="dot" id="liveDot"></div>
+      <div>
+        <div class="brand-name brand">RESONANT PLATE</div>
+        <div class="brand-sub">sound made visible</div>
+      </div>
+    </div>
+    <div class="stat-cluster">
+      <div>FPS <b id="fpsOut">60</b></div>
+      <div>GRAINS <b id="countOut">0</b></div>
+      <div>SRC <b id="srcOut">—</b></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="plateWrap">
+      <canvas id="plate" width="560" height="560"></canvas>
+      <div id="startOverlay">
+        <h2>Tap to wake the plate</h2>
+        <p>Then speak, sing, hum, clap, or play a track near your mic — or upload an audio file. The grains will find the quiet spots.</p>
+        <button id="startBtn">Start</button>
+      </div>
+    </div>
+
+    <div class="controls" id="controlBar" style="display:none;">
+      <button class="ctl" id="micBtn">🎙 Microphone</button>
+      <button class="ctl" id="uploadBtn">⤒ Upload audio</button>
+      <input type="file" id="fileInput" accept="audio/*">
+      <div class="sens">
+        <label>SENSITIVITY</label>
+        <input type="range" id="sensSlider" min="0.5" max="6" step="0.1" value="2.2">
+      </div>
+      <button class="ctl" id="resetBtn">↺ Scatter</button>
+      <button class="ctl" id="nextModeBtn">→ Next pattern</button>
+    </div>
+  </main>
+
+  <footer>
+    <div>
+      <div class="readout-label">VIBRATION FREQUENCY</div>
+      <div class="readout-value" id="freqOut">0.0 Hz</div>
+    </div>
+    <div class="col-right">
+      <div class="readout-label">CIRCULAR PLATE (BESSEL)</div>
+      <div class="readout-value small" id="modeOut">MODE (m: 0, n: 1)</div>
+      <div class="readout-sub" id="levelOut">signal level 0%</div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  // ---------- canvas & plate geometry ----------
+  const canvas = document.getElementById('plate');
+  const ctx = canvas.getContext('2d');
+  const plateWrap = document.getElementById('plateWrap');
+
+  function sizeCanvas(){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const size = Math.max(280, Math.min(vw, vh) * (vw < 640 ? 0.86 : 0.62));
+    canvas.width = size; canvas.height = size;
+    canvas.style.width = size + 'px'; canvas.style.height = size + 'px';
+    plateWrap.style.width = size + 'px'; plateWrap.style.height = size + 'px';
+  }
+  sizeCanvas();
+  window.addEventListener('resize', () => { sizeCanvas(); buildField(); scatterParticles(); });
+
+  // ---------- Bessel function J_m(x) via power series ----------
+  function factorial(n){ let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
+  const factCache = [];
+  function fact(n){ return factCache[n] ?? (factCache[n] = factorial(n)); }
+
+  function besselJ(m, x){
+    let sum = 0;
+    const half = x / 2;
+    for (let k = 0; k < 22; k++){
+      const sign = (k % 2 === 0) ? 1 : -1;
+      const term = sign * Math.pow(half, 2 * k + m) / (fact(k) * fact(k + m));
+      sum += term;
+      if (Math.abs(term) < 1e-9 && k > 4) break;
+    }
+    return sum;
+  }
+
+  // zeros of J_m, first 5 roots, m = 0..5
+  const BESSEL_ZEROS = {
+    0: [2.405, 5.520, 8.654, 11.792, 14.931],
+    1: [3.832, 7.016, 10.173, 13.324, 16.471],
+    2: [5.136, 8.417, 11.620, 14.796, 17.960],
+    3: [6.380, 9.761, 13.015, 16.223, 19.409],
+    4: [7.588, 11.065, 14.373, 17.616, 20.807],
+    5: [8.771, 12.339, 15.700, 18.980, 22.178],
+  };
+
+  // curated (m, n) sequence, low -> high complexity, mapped across the audible range
+  const MODE_SEQUENCE = [
+    [0,1],[1,1],[2,1],[0,2],[3,1],[1,2],
+    [4,1],[2,2],[3,2],[0,3],[5,1],[4,2],
+    [1,3],[2,3],[5,2],[3,3]
+  ];
+
+  // ---------- scalar field (precomputed on mode change) ----------
+  const GRID = 180;
+  let field = new Float32Array(GRID * GRID);
+  let currentMode = [0,1];
+  let R = 1; // plate radius in plate-space units, fixed at 1
+
+  function buildField(){
+    const [m, n] = currentMode;
+    const k = BESSEL_ZEROS[m][n - 1] / R;
+    let maxAbs = 1e-6;
+    for (let gy = 0; gy < GRID; gy++){
+      const y = (gy / (GRID - 1)) * 2 * R - R;
+      for (let gx = 0; gx < GRID; gx++){
+        const x = (gx / (GRID - 1)) * 2 * R - R;
+        const r = Math.sqrt(x*x + y*y);
+        let v = 0;
+        if (r <= R){
+          const theta = Math.atan2(y, x);
+          v = besselJ(m, k * r) * Math.cos(m * theta);
+        }
+        field[gy * GRID + gx] = v;
+        if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+      }
+    }
+    for (let i = 0; i < field.length; i++) field[i] /= maxAbs;
+  }
+  buildField();
+
+  function sampleField(x, y){
+    const gx = Math.min(GRID - 1, Math.max(0, Math.floor(((x + R) / (2 * R)) * (GRID - 1))));
+    const gy = Math.min(GRID - 1, Math.max(0, Math.floor(((y + R) / (2 * R)) * (GRID - 1))));
+    return field[gy * GRID + gx];
+  }
+
+  // ---------- particles (sand grains) ----------
+  const COUNT = window.innerWidth < 640 ? 3500 : 7000;
+  const px = new Float32Array(COUNT);
+  const py = new Float32Array(COUNT);
+
+  function scatterParticles(){
+    for (let i = 0; i < COUNT; i++){
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * R * 0.98;
+      px[i] = Math.cos(ang) * rad;
+      py[i] = Math.sin(ang) * rad;
+    }
+  }
+  scatterParticles();
+  document.getElementById('countOut').textContent = COUNT.toLocaleString();
+
+  // ---------- audio ----------
+  let audioCtx = null, analyser = null, freqData = null, timeData = null;
+  let currentSource = null;
+  let sensitivity = 2.2;
+  let dominantFreq = 0;
+  let audioLevel = 0;
+
+  function initAudio(){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.75;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+  }
+
+  async function useMicrophone(){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (currentSource) try{ currentSource.disconnect(); }catch(e){}
+      const src = audioCtx.createMediaStreamSource(stream);
+      src.connect(analyser);
+      currentSource = src;
+      setLive(true, 'mic');
+    }catch(err){
+      alert('Could not access the microphone: ' + err.message);
+    }
+  }
+
+  async function useFile(file){
+    const arrayBuf = await file.arrayBuffer();
+    const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+    if (currentSource) try{ currentSource.stop(); currentSource.disconnect(); }catch(e){}
+    const src = audioCtx.createBufferSource();
+    src.buffer = audioBuf;
+    src.loop = true;
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    src.start(0);
+    currentSource = src;
+    setLive(true, 'file');
+  }
+
+  function setLive(isLive, label){
+    document.getElementById('liveDot').classList.toggle('live', isLive);
+    document.getElementById('srcOut').textContent = label || '—';
+  }
+
+  // dominant frequency + level from analyser
+  function readAudio(){
+    if (!analyser) return;
+    analyser.getByteFrequencyData(freqData);
+    analyser.getByteTimeDomainData(timeData);
+
+    // RMS level
+    let sumSq = 0;
+    for (let i = 0; i < timeData.length; i++){
+      const v = (timeData[i] - 128) / 128;
+      sumSq += v * v;
+    }
+    const rms = Math.sqrt(sumSq / timeData.length);
+    const targetLevel = Math.min(1, rms * 9);
+    // faster attack (react quickly) than decay (don't collapse to zero between words)
+    audioLevel = targetLevel > audioLevel
+      ? audioLevel * 0.5 + targetLevel * 0.5
+      : audioLevel * 0.85 + targetLevel * 0.15;
+
+    // spectral centroid: energy-weighted average bin, far more representative
+    // of a sound's actual pitch/brightness than whichever single bin peaks
+    // (a single peak tends to latch onto low bass/room-hum energy and get stuck there)
+    const binHz = audioCtx.sampleRate / analyser.fftSize;
+    let weightedSum = 0, totalEnergy = 0, peakVal = 0;
+    for (let i = 3; i < freqData.length; i++){
+      const val = freqData[i];
+      if (val > peakVal) peakVal = val;
+      // square the magnitude so louder bins dominate the average more strongly
+      const weight = val * val;
+      weightedSum += weight * i;
+      totalEnergy += weight;
+    }
+    if (peakVal > 25 && totalEnergy > 0){
+      const centroidBin = weightedSum / totalEnergy;
+      const newFreq = centroidBin * binHz;
+      // faster-reacting smoothing so pitch changes show up quickly
+      dominantFreq = dominantFreq * 0.55 + newFreq * 0.45;
+    }
+  }
+
+  // ---------- mode selection with hysteresis ----------
+  let candidateBucket = 0, candidateCount = 0, activeBucket = 0;
+  // tuned to the range most voices, instruments, and everyday sounds actually
+  // occupy, so the full set of patterns is reachable, not just the bottom slice
+  const FREQ_MIN = 80, FREQ_MAX = 1400;
+
+  function updateMode(){
+    if (dominantFreq < 30 || audioLevel < 0.02) return;
+    const f = Math.min(FREQ_MAX, Math.max(FREQ_MIN, dominantFreq));
+    const t = (Math.log(f) - Math.log(FREQ_MIN)) / (Math.log(FREQ_MAX) - Math.log(FREQ_MIN));
+    const bucket = Math.min(MODE_SEQUENCE.length - 1, Math.floor(t * MODE_SEQUENCE.length));
+
+    if (bucket === candidateBucket){
+      candidateCount++;
+    } else {
+      candidateBucket = bucket;
+      candidateCount = 0;
+    }
+    if (candidateCount > 8 && bucket !== activeBucket){
+      activeBucket = bucket;
+      currentMode = MODE_SEQUENCE[activeBucket];
+      buildField();
+      const [m, n] = currentMode;
+      document.getElementById('modeOut').textContent = `MODE (m: ${m}, n: ${n})`;
+    }
+  }
+
+  // ---------- animation loop ----------
+  let lastTime = performance.now();
+  let fpsSmooth = 60;
+
+  function step(now){
+    const dt = now - lastTime;
+    lastTime = now;
+    fpsSmooth = fpsSmooth * 0.9 + (1000 / Math.max(dt, 1)) * 0.1;
+
+    readAudio();
+    updateMode();
+
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const pxScale = (Math.min(canvas.width, canvas.height) / 2) * 0.98;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // subtle plate backdrop
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, pxScale);
+    grad.addColorStop(0, '#0d0d10');
+    grad.addColorStop(1, '#020203');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, pxScale, 0, Math.PI * 2);
+    ctx.fill();
+
+    const jumpBase = 0.02 * R;
+    // curve the level so moderate mic volume still produces clearly visible motion,
+    // instead of needing to shout to see anything happen
+    const level = Math.pow(Math.min(1, audioLevel * sensitivity), 0.55);
+
+    ctx.fillStyle = 'rgba(217,168,108,0.85)';
+    for (let i = 0; i < COUNT; i++){
+      let x = px[i], y = py[i];
+      const d = sampleField(x, y);
+      const amp = Math.abs(d);
+      const jumpProb = amp * level * 1.6;
+
+      if (Math.random() < jumpProb){
+        const ang = Math.random() * Math.PI * 2;
+        const dist = jumpBase * (0.4 + amp) * (0.5 + Math.random());
+        const nx = x + Math.cos(ang) * dist;
+        const ny = y + Math.sin(ang) * dist;
+        if (nx*nx + ny*ny <= R*R){ x = nx; y = ny; }
+        px[i] = x; py[i] = y;
+      }
+
+      const sx = cx + (x / R) * pxScale;
+      const sy = cy + (y / R) * pxScale;
+      ctx.fillRect(sx, sy, 1.4, 1.4);
+    }
+
+    document.getElementById('fpsOut').textContent = Math.round(fpsSmooth);
+    document.getElementById('freqOut').textContent = dominantFreq > 20 ? dominantFreq.toFixed(1) + ' Hz' : '0.0 Hz';
+    document.getElementById('levelOut').textContent = 'signal level ' + Math.round(Math.min(1,audioLevel) * 100) + '%';
+
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+
+  // ---------- UI wiring ----------
+  document.getElementById('startBtn').addEventListener('click', () => {
+    initAudio();
+    document.getElementById('startOverlay').style.display = 'none';
+    document.getElementById('controlBar').style.display = 'flex';
+  });
+
+  document.getElementById('micBtn').addEventListener('click', async () => {
+    await audioCtx.resume();
+    await useMicrophone();
+    document.getElementById('micBtn').classList.add('active');
+    document.getElementById('uploadBtn').classList.remove('active');
+  });
+
+  document.getElementById('uploadBtn').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+
+  document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await audioCtx.resume();
+    await useFile(file);
+    document.getElementById('uploadBtn').classList.add('active');
+    document.getElementById('micBtn').classList.remove('active');
+  });
+
+  document.getElementById('sensSlider').addEventListener('input', (e) => {
+    sensitivity = parseFloat(e.target.value);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', scatterParticles);
+
+  document.getElementById('nextModeBtn').addEventListener('click', () => {
+    activeBucket = (activeBucket + 1) % MODE_SEQUENCE.length;
+    candidateBucket = activeBucket;
+    candidateCount = 0;
+    currentMode = MODE_SEQUENCE[activeBucket];
+    buildField();
+    const [m, n] = currentMode;
+    document.getElementById('modeOut').textContent = `MODE (m: ${m}, n: ${n})`;
+  });
+})();
+</script>
+</body>
+</html>
